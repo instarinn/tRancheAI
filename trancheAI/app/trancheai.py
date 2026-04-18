@@ -9,6 +9,11 @@ from langchain_openai import ChatOpenAI
 from langchain_core.prompts import ChatPromptTemplate
 from langgraph.graph import StateGraph, END
 import psycopg
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 load_dotenv()
 
@@ -498,6 +503,8 @@ User question:
     )
 
     state["agent1_plan"] = result.model_dump()
+
+    logger.info(f"agent1_query_planner Executed")
     return state
 
 
@@ -585,6 +592,8 @@ Agent 1 plan:
 
     state["sql_query"] = sql_query
     state["sql_validation_notes"] = result.validation_notes
+
+    logger.info(f"agent2_sql_writer Executed")
     return state
 
 
@@ -626,11 +635,14 @@ def agent3_sql_executor(state: GraphState) -> GraphState:
 
         state["sql_result"] = result
         state["execution_error"] = ""
+
+        logger.info(f"agent3_sql_executor Executed, rows returned: {len(result)}")
         return state
 
     except Exception as e:
         state["sql_result"] = []
         state["execution_error"] = str(e)
+        logger.error(f"agent3_sql_executor Error: {str(e)}")
         return state
 
 
@@ -689,6 +701,7 @@ Execution error:
     )
 
     state["final_answer"] = result.answer
+    logger.info(f"agent4_answer_generator Executed")
     return state
 
 
