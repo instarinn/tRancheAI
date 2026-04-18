@@ -355,6 +355,20 @@ Business rules:
 - If owner-specific data: customers.owner_user_id = :user_id
 - If followup-specific data: followups.assigned_user_id = :user_id
 - If builder-specific data: customers.builder_id = :builder_id
+- Below are the loan status values exactly use these values when filtering for loan status:
+
+| current_status |
+| -------------- |
+| Bank Login     |
+| Cancelled      |
+| Disbursed      |
+| Follow-up      |
+| KYC Pending    |
+| Lost           |
+| New Lead       |
+| Sanctioned     |
+| Under review   |
+
 - Only read-only queries are allowed.
 - Never generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE.
 """
