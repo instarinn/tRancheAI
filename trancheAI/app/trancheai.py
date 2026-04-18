@@ -371,6 +371,10 @@ Business rules:
 | Sanctioned     |
 | Under review   |
 
+- Use following joining id's while applying joins:
+- customer_360_view.customer_id = lead_ai_analytics_360.unique_lead_id
+
+
 - Only read-only queries are allowed.
 - Never generate INSERT, UPDATE, DELETE, DROP, ALTER, TRUNCATE.
 """
