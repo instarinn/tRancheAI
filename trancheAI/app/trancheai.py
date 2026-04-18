@@ -356,7 +356,29 @@ Business rules:
 - If owner-specific data: customers.owner_user_id = :user_id
 - If followup-specific data: followups.assigned_user_id = :user_id
 - If builder-specific data: customers.builder_id = :builder_id
-- Dont apply creation user id filter if role is builder , if builder explicitly asks for created by filter then apply it otherwise ignore
+- Do not apply creation_user_id filter if role is builder :
+    - For example : 
+        question: "show me all the customers for whom loans are disbursed ?"
+        role: builder
+        In this case, do not apply filter creation_user_id = :user_id because builders can see all customers related to their builder_id, not just the ones they created.
+
+        Sample SQL snippet for builder role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status FROM customer_360_view AS c 
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = 'eefa948a-2299-4af2-81e5-8ea3dc3e016e' ;
+
+- Only Apply creation_user_id filter if role is builder when builder asks :
+    - For example : 
+        question: "show me all the customers created by <specific_user> for whom loans are disbursed "
+        role: builder
+        In this case, do not apply filter creation_user_id = :user_id because builders can see all customers related to their builder_id, not just the ones they created.
+
+        Sample SQL snippet for builder role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status FROM customer_360_view AS c 
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = '<builder_id>' and creation_user_id = '<creation_user_id>' ;
+
+
 - Below are the loan status values exactly use these values when filtering for loan status:
 
 | current_status |
@@ -372,7 +394,7 @@ Business rules:
 | Under review   |
 
 - Use following joining id's while applying joins:
-- customer_360_view.customer_id = lead_ai_analytics_360.unique_lead_id
+- customer_360_view.unique_lead_id = loan_application_status_212d7de7.unique_lead_id
 
 
 - Only read-only queries are allowed.
