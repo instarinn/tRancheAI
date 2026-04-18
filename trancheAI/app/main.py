@@ -1,7 +1,13 @@
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+import logging
+import json
 from app.trancheai import ask_tranchiq_bot
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title="TranchIQ Chatbot API")
 
@@ -31,6 +37,9 @@ def health_check():
 
 @app.post("/chat", response_model=ChatResponse)
 def chat(req: ChatRequest):
+    # Log incoming payload
+    logger.info(f"Incoming chat request: {json.dumps(req.dict())}")
+    
     try:
         result = ask_tranchiq_bot(
             user_question=req.question,

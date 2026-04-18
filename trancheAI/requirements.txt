@@ -7,3 +7,4 @@ langgraph
 psycopg[binary]
 pydantic
 Supabase
+logger
