@@ -625,7 +625,7 @@ def agent3_sql_executor(state: GraphState) -> GraphState:
     try:
         final_sql = substitute_params(state["sql_query"], state["user_context"])
 
-        with psycopg.connect(SUPABASE_DB_URL) as conn:
+        with psycopg.connect(SUPABASE_URL) as conn:
             with conn.cursor() as cur:
                 cur.execute(final_sql)
                 columns = [desc[0] for desc in cur.description] if cur.description else []
