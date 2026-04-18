@@ -743,6 +743,7 @@ def ask_tranchiq_bot(
 # EXAMPLE
 # =========================================================
 
+"""
 if __name__ == "__main__":
     user_context = {
         "user_id": "11111111-1111-1111-1111-111111111111",
@@ -777,3 +778,4 @@ if __name__ == "__main__":
 
         print("\nFINAL ANSWER:")
         print(result["final_answer"])
+"""
