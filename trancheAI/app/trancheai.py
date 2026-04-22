@@ -383,6 +383,32 @@ Business rules:
         SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status FROM customer_360_view AS c 
         JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = '<builder_id>' and creation_user_id = '<creation_user_id>' ;
 
+- Customer with Pending tranches means disbursed custolmer with pending payments.
+- For example : 
+        question: "show me all the customers with pending tranches"
+        role: builder or salesperson
+        
+        Sample SQL snippet for builder role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status FROM customer_360_view AS c 
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = '<builder_id>' AND pening_payment_count > 0 ;
+
+- Customer to followup today will be all the customers or leads created in last 5 days.
+- For example : 
+        question: "show me all the customers whom i need to followup today"
+        role: builder or salesperson
+        
+        Sample SQL snippet for builder role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amountFROM customer_360_view AS c where customer_created_at >= current_date - interval '5' day AND c.builder_id = '<builder_id>' ;
+        
+
+        
+- Customer/Leads can be classified as Hot/Warm/Cold based on creation date. Hot customers can also be classified as high intent customers.
+if creation_date is within 7 days -> Hot
+if creation_date is between 7 to 30 days -> Warm 
+if creation_date is more than 30 days -> Cold
+
 
 - Below are the loan status values exactly use these values when filtering for loan status:
 
@@ -619,7 +645,6 @@ def substitute_params(sql: str, user_context: Dict[str, Any]) -> str:
                 replacement = f"'{escaped}'"
             safe_sql = safe_sql.replace(placeholder, replacement)
     return safe_sql
-
 
 def agent3_sql_executor(state: GraphState) -> GraphState:
     try:
