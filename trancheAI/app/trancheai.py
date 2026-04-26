@@ -402,8 +402,322 @@ Business rules:
 
         SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view AS c where customer_created_at >= current_date - interval '5' day AND c.builder_id = '<builder_id>' ;
         
+- How many leads were generated this week?
+- For example :
+        question: "how many leads were generated this week?"
+        role: builder
+
+        Sample SQL snippet for builder role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view where customer_created_at >= current_date - interval '7' day AND builder_id = '<builder_id>' ;
+
+        question: "how many leads were generated this week?"
+        role: salesperson
+
+        Sample SQL snippet for salesperson role:
+
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view where customer_created_at >= current_date - interval '7' day AND creation_user_id = '<salesperson_user_id>' ;
 
         
+- Which salesperson generated the most leads this month?
+- For example :
+        question: "Which salesperson generated the most leads this month?"
+        role: builder
+
+        Sample SQL snippet for builder role:
+
+        SELECT c.creator_name , count(*) FROM customer_360_view c where builder_id = '<builder_id>' 
+        group by c.creator_name 
+        order by count(*) desc limit 5;
+
+- What is the conversion rate from leads to bookings?
+- For example :
+        question: "What is the conversion rate from leads to bookings?"
+        role: builder
+
+        Sample SQL snippet for builder role:
+
+        SELECT 
+        COUNT(*) as total_leads,
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END) as total_bookings,
+        ROUND(
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END)::NUMERIC / 
+        NULLIF(COUNT(*), 0) * 100, 
+        2
+        ) as conversion_rate_percentage
+        FROM leads
+        WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'
+        and attributed_builder_id = '<builder_id>'; -- Last 90 days
+
+-- OR by time period (monthly trend):
+        SELECT 
+        DATE_TRUNC('month', created_at) as month,
+        COUNT(*) as total_leads,
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END) as bookings,
+        ROUND(
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END)::NUMERIC / 
+        NULLIF(COUNT(*), 0) * 100, 
+        2
+        ) as conversion_rate
+        FROM leads
+        WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
+        and attributed_builder_id = '<builder_id>'
+        GROUP BY DATE_TRUNC('month', created_at)
+        ORDER BY month DESC;
+
+-- OR by lead source (channel-wise conversion):
+        SELECT 
+        lead_source,
+        COUNT(*) as total_leads,
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END) as bookings,
+        ROUND(
+        COUNT(CASE WHEN booking_status = 'Booked' THEN 1 END)::NUMERIC / 
+        NULLIF(COUNT(*), 0) * 100, 
+        2
+        ) as conversion_rate
+        FROM leads
+        WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'
+        and attributed_builder_id = '<builder_id>'
+        GROUP BY lead_source
+        ORDER BY conversion_rate DESC;
+
+- Show me leads pending follow-up for more than 3 days?
+- For example :
+        question: "Show me leads pending follow-up for more than 3 days"
+        role: builder
+
+        Sample SQL snippet for builder role:
+
+-- Leads pending follow-up for more than 3 days
+        SELECT 
+        l.id,
+        l.full_name,
+        l.mobile,
+        l.email,
+        l.source,
+        l.assigned_to as salesperson,
+        l.status,
+        l.last_followed_up_date,
+        l.follow_up_date,
+        CURRENT_DATE - l.follow_up_date as days_overdue
+        FROM leads l
+        WHERE l.follow_up_date IS NOT NULL
+        AND l.follow_up_date < CURRENT_DATE - INTERVAL '3 days'
+        AND l.status NOT IN ('Booked', 'lost', 'Dead', 'Converted')
+        where attributed_builder_id = '<builder_id>'
+        ORDER BY l.follow_up_date ASC
+        LIMIT 100;
+
+-- OR if you want to see by salesperson:
+        SELECT 
+        l.assigned_to as salesperson,
+        COUNT(*) as pending_followups,
+        AVG(CURRENT_DATE - l.follow_up_date) as avg_days_overdue
+        FROM leads l
+        WHERE l.follow_up_date IS NOT NULL
+        AND l.follow_up_date < CURRENT_DATE - INTERVAL '3 days'
+        AND l.status NOT IN ('Booked', 'lost', 'Dead', 'Converted')
+        GROUP BY l.assigned_to
+        ORDER BY pending_followups DESC;
+
+
+--Show my leads for today
+- For example :
+        question: "Show my leads for today"
+        role: salesperson
+
+        Sample SQL snippet for builder role:
+
+        SELECT 
+        l.id,
+        l.unique_lead_id,
+        l.full_name,
+        l.mobile,
+        l.email,
+        l.status,
+        l.source,
+        l.created_at,
+        l.sales_stage,
+        ai.lead_temperature,
+        ai.priority
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        WHERE l.created_by = "<salesperson_id>"
+        AND DATE(l.created_at) = CURRENT_DATE
+        ORDER BY l.created_at DESC;
+
+-- Which leads do I need to follow up today?
+- For example :
+        question: "Which leads do I need to follow up today?"
+        role: salesperson
+
+        Sample SQL snippet for builder role:
+
+        SELECT 
+        l.id,
+        l.unique_lead_id,
+        l.full_name,
+        l.mobile,
+        l.email,
+        l.status,
+        l.follow_up_date,
+        l.last_followed_up_date,
+        l.last_followed_up_type,
+        l.follow_up_count,
+        ai.lead_temperature,
+        ai.priority,
+        ai.days_since_last_activity,
+        CASE 
+        WHEN l.follow_up_date < CURRENT_DATE THEN 'Overdue'
+        WHEN l.follow_up_date = CURRENT_DATE THEN 'Due Today'
+        END as follow_up_status,
+        CURRENT_DATE - l.follow_up_date as days_overdue
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        WHERE l.created_by = '<salespersonid>'
+        AND l.follow_up_date IS NOT NULL
+        AND l.follow_up_date <= CURRENT_DATE
+        AND l.status NOT IN ('lost', 'disbursed') 
+        ORDER BY 
+        CASE WHEN l.follow_up_date < CURRENT_DATE THEN 0 ELSE 1 END,  
+        l.follow_up_date ASC,
+        ai.priority DESC NULLS LAST;
+
+-- Show details of lead "<Customer Name>"
+- For example :
+        question: "Show details of lead "<Customer Name>"?"
+        role: salesperson
+
+        Sample SQL snippet for builder role:
+
+        SELECT 
+        l.*,
+        ai.lead_temperature,
+        ai.priority,
+        la.status as loan_status,
+        la.loan_amount,
+        la.bank_name
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        LEFT JOIN LATERAL (
+        SELECT * 
+        FROM loan_applications 
+        WHERE lead_id = l.id 
+        ORDER BY created_at DESC 
+        LIMIT 1
+        ) la ON true
+        WHERE l.created_by = '<salesperson_id>'  -- Replace with actual salesperson user ID
+        AND l.full_name ILIKE '%<customer name%'
+        LIMIT 1;
+
+-- OR if you want to search by phone:
+        SELECT 
+        l.*,
+        ai.lead_temperature,
+        ai.priority,
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        WHERE l.created_by = '<salesperson_id'
+        AND (l.full_name ILIKE '%<customer name%>' OR l.mobile ILIKE '%9876543210%')
+        LIMIT 5;
+
+-- Which leads have not responded after first contact?
+- For example :
+        question: "Which leads have not responded after first contact?"
+        role: salesperson
+
+        SELECT 
+        l.id,
+        l.unique_lead_id,
+        l.full_name,
+        l.mobile,
+        l.email,
+        l.status,
+        l.created_at,
+        l.follow_up_count,
+        l.last_followed_up_date,
+        l.last_followed_up_type,
+        ai.days_since_last_activity,
+        ai.last_activity_at,
+        ai.is_dormant_7_days,
+        ai.is_dormant_14_days,
+        ai.lead_temperature,
+        CURRENT_DATE - DATE(l.created_at) as days_since_creation
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        WHERE l.created_by = 'eefa948a-2299-4af2-81e5-8ea3dc3e016e'  -- Replace with actual salesperson user ID
+        AND l.status NOT IN ('lost', 'disbursed')
+        AND (
+        -- No follow-ups at all
+        (l.follow_up_count IS NULL OR l.follow_up_count = 0)
+        OR 
+        -- OR last follow-up was more than 3 days ago
+        (l.last_followed_up_date IS NOT NULL AND l.last_followed_up_date < CURRENT_DATE - INTERVAL '3 days')
+        OR
+        -- OR dormant for 7+ days
+        ai.is_dormant_7_days = true
+        )
+        AND l.created_at < CURRENT_DATE - INTERVAL '1 day'  -- Exclude today's leads (give them time)
+        ORDER BY 
+        CASE 
+        WHEN ai.is_dormant_14_days THEN 1
+        WHEN ai.is_dormant_7_days THEN 2
+        WHEN l.follow_up_count = 0 THEN 3
+        ELSE 4
+        END,
+        l.created_at DESC
+        LIMIT 50;
+
+-- Give me high-priority leads
+- For example :
+        question: "Give me high-priority leads?"
+        role: salesperson
+
+        SELECT 
+        l.id,
+        l.unique_lead_id,
+        l.full_name,
+        l.mobile,
+        l.email,
+        l.status,
+        l.created_at,
+        l.follow_up_date,
+        l.sales_stage,
+        ai.priority,
+        ai.lead_temperature,
+        CASE 
+            WHEN ai.lead_temperature = 'hot' THEN 3
+            WHEN ai.lead_temperature = 'warm' THEN 2
+            ELSE 1
+        END as temp_score,
+        CASE 
+            WHEN ai.priority = 'high' THEN 3
+            WHEN ai.priority = 'medium' THEN 2
+        ELSE 1
+        END as priority_score
+        FROM leads l
+        LEFT JOIN lead_ai_analytics_360 ai ON l.id = ai.lead_id
+        WHERE l.created_by = '<salesperson_id>'  -- Replace with actual salesperson user ID
+        AND l.status NOT IN ('lost', 'disbursed')
+        AND (
+        -- AI-based high priority
+        ai.priority = 'high'
+        OR ai.lead_temperature = 'hot'
+        OR ai.engagement_score >= 70
+        OR ai.lead_score >= 80
+        -- OR behavioral signals
+        OR ai.has_property_finalized = true
+        OR ai.has_high_document_engagement = true
+        -- OR intent-based
+        OR ai.intent_stage IN ('Negotiating', 'Ready to Close')
+        )
+        ORDER BY 
+        priority_score DESC,
+        temp_score DESC,
+        ai.engagement_score DESC NULLS LAST,
+        l.created_at DESC
+        LIMIT 50;
+
 - Customer/Leads can be classified as Hot/Warm/Cold based on creation date. Hot customers can also be classified as high intent customers.
 if creation_date is within 7 days -> Hot
 if creation_date is between 7 to 30 days -> Warm 
