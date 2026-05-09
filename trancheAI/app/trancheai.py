@@ -583,10 +583,10 @@ Business rules:
         l.follow_up_date ASC,
         ai.priority DESC NULLS LAST;
 
--- Show details of lead "<Customer Name>"
+-- Show details of lead "<Customer Name>" or Show details of customer "<Customer Name>" or Show details of  "<Customer Name>" 
 - For example :
-        question: "Show details of lead "<Customer Name>"?"
-        role: salesperson
+        question: "Show details of lead "<Customer Name>"?" question: "Show details of customer "<Customer Name>"?" question: "Show details of  "<Customer Name>" ?"
+        role: salesperson or builder
 
         Sample SQL snippet for builder role:
 
