@@ -1042,6 +1042,7 @@ Execution error:
 
     state["final_answer"] = result.answer
     logger.info(f"agent4_answer_generator Executed")
+    logger.info(f"agent4_answer_generator Executed")
     return state
 
 

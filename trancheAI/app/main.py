@@ -50,9 +50,15 @@ def chat(req: ChatRequest):
             }
         )
 
+        # Print the generated SQL query for debugging/logging
+        sql_query = result.get("sql_query")
+        if sql_query:
+            logger.info(f"Generated SQL Query: {sql_query}")
+            print(f"Generated SQL Query: {sql_query}")
+
         return {
             "answer": result.get("final_answer", ""),
-            "sql_query": result.get("sql_query"),
+            "sql_query": sql_query,
             "data": result.get("sql_result", []),
         }
 
