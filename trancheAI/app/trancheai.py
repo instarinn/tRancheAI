@@ -759,6 +759,7 @@ class GraphState(TypedDict):
     sql_validation_notes: str
     sql_result: List[Dict[str, Any]]
     execution_error: str
+    correction_attempt_count: int
     final_answer: str
 
 
@@ -783,6 +784,11 @@ class QueryPlan(BaseModel):
 class SQLGenerationOutput(BaseModel):
     sql_query: str
     validation_notes: str
+
+
+class SQLCorrectionOutput(BaseModel):
+    corrected_sql_query: str
+    correction_notes: str
 
 
 class NLAnswerOutput(BaseModel):
@@ -975,6 +981,7 @@ def agent3_sql_executor(state: GraphState) -> GraphState:
 
         state["sql_result"] = result
         state["execution_error"] = ""
+        state["correction_attempt_count"] = 0  # Reset on successful execution
 
         logger.info(f"agent3_sql_executor Executed, rows returned: {len(result)}")
         return state
@@ -984,6 +991,93 @@ def agent3_sql_executor(state: GraphState) -> GraphState:
         state["execution_error"] = str(e)
         logger.error(f"agent3_sql_executor Error: {str(e)}")
         return state
+
+
+# =========================================================
+# AGENT 3.5: SQL QUERY CORRECTOR
+# =========================================================
+
+def agent3_5_sql_corrector(state: GraphState) -> GraphState:
+    """Corrects SQL query when execution fails."""
+    
+    # Prevent infinite correction loops (max 2 attempts)
+    max_correction_attempts = 2
+    if state["correction_attempt_count"] >= max_correction_attempts:
+        logger.warning(f"Max correction attempts ({max_correction_attempts}) reached. Stopping corrections.")
+        return state
+    
+    structured_llm = llm.with_structured_output(SQLCorrectionOutput)
+
+    prompt = ChatPromptTemplate.from_messages(
+        [
+            (
+                "system",
+                """
+You are Agent 3.5 for TranchIQ chatbot - SQL Query Corrector.
+
+Your job:
+1. Analyze the error from SQL execution
+2. Identify what went wrong in the query
+3. Write a corrected PostgreSQL SELECT query
+4. Ensure the corrected query follows the schema and access control rules
+5. Return ONLY the corrected query, no explanations in the query itself
+
+Rules:
+- Only modify the query to fix the error
+- Maintain the original intent and business logic
+- Keep all mandatory user scoping filters
+- Use PostgreSQL / Supabase syntax
+- Include proper joins and aliases
+"""
+            ),
+            (
+                "user",
+                """
+Schema:
+{schema_context}
+
+User context:
+{user_context}
+
+Original query plan:
+{agent1_plan}
+
+Failing SQL query:
+{sql_query}
+
+Execution error:
+{execution_error}
+
+Please correct this query to resolve the error.
+"""
+            )
+        ]
+    )
+
+    result = structured_llm.invoke(
+        prompt.format_messages(
+            schema_context=state["schema_context"],
+            user_context=json.dumps(state["user_context"], indent=2),
+            agent1_plan=json.dumps(state["agent1_plan"], indent=2),
+            sql_query=state["sql_query"],
+            execution_error=state["execution_error"],
+        )
+    )
+
+    corrected_sql = result.corrected_sql_query.strip()
+    
+    # Update the SQL query with the corrected version
+    state["sql_query"] = corrected_sql
+    state["correction_attempt_count"] += 1
+    
+    logger.info(f"agent3_5_sql_corrector: Corrected query (attempt {state['correction_attempt_count']})")
+    logger.info(f"Corrected SQL: {corrected_sql}")
+    logger.info(f"Correction notes: {result.correction_notes}")
+    
+    # Clear the error so executor can retry
+    state["execution_error"] = ""
+    
+    return state
 
 
 # =========================================================
@@ -1050,18 +1144,40 @@ Execution error:
 # GRAPH
 # =========================================================
 
+def should_correct_sql(state: GraphState) -> str:
+    """Determines if SQL correction is needed."""
+    if state["execution_error"] and state["correction_attempt_count"] < 2:
+        return "agent3_5_sql_corrector"
+    else:
+        return "agent4_answer_generator"
+
+
 def build_graph():
     graph = StateGraph(GraphState)
 
     graph.add_node("agent1_query_planner", agent1_query_planner)
     graph.add_node("agent2_sql_writer", agent2_sql_writer)
     graph.add_node("agent3_sql_executor", agent3_sql_executor)
+    graph.add_node("agent3_5_sql_corrector", agent3_5_sql_corrector)
     graph.add_node("agent4_answer_generator", agent4_answer_generator)
 
     graph.set_entry_point("agent1_query_planner")
     graph.add_edge("agent1_query_planner", "agent2_sql_writer")
     graph.add_edge("agent2_sql_writer", "agent3_sql_executor")
-    graph.add_edge("agent3_sql_executor", "agent4_answer_generator")
+    
+    # Conditional routing: if execution fails, go to corrector; otherwise go to answer generator
+    graph.add_conditional_edges(
+        "agent3_sql_executor",
+        should_correct_sql,
+        {
+            "agent3_5_sql_corrector": "agent3_5_sql_corrector",
+            "agent4_answer_generator": "agent4_answer_generator"
+        }
+    )
+    
+    # After correction, retry execution
+    graph.add_edge("agent3_5_sql_corrector", "agent3_sql_executor")
+    
     graph.add_edge("agent4_answer_generator", END)
 
     return graph.compile()
@@ -1086,6 +1202,7 @@ def ask_tranchiq_bot(
         "sql_validation_notes": "",
         "sql_result": [],
         "execution_error": "",
+        "correction_attempt_count": 0,
         "final_answer": "",
     }
 
