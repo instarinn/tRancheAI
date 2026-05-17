@@ -355,15 +355,127 @@ Available tables:
 -utm_source (text)
 -viewport_size (text)
 
+5. Projects
+
+| column_name                 | data_type                |
+| --------------------------- | ------------------------ |
+| id                          | uuid                     |
+| project_name                | character varying        |
+| project_code                | character varying        |
+| location                    | text                     |
+| city                        | character varying        |
+| state                       | character varying        |
+| pincode                     | character varying        |
+| registration_number         | character varying        |
+| registration_date           | date                     |
+| survey_details              | text                     |
+| total_units                 | integer                  |
+| available_units             | integer                  |
+| project_type                | character varying        |
+| possession_date             | date                     |
+| approved_banks              | jsonb                    |
+| builder_name                | character varying        |
+| builder_company_name        | character varying        |
+| builder_contact_name        | character varying        |
+| builder_phone               | character varying        |
+| builder_email               | character varying        |
+| builder_gst_number          | character varying        |
+| builder_pan_number          | character varying        |
+| builder_registration_number | character varying        |
+| builder_address             | text                     |
+| builder_city                | character varying        |
+| builder_state               | character varying        |
+| builder_pincode             | character varying        |
+| builder_bank_name           | character varying        |
+| builder_account_number      | character varying        |
+| builder_ifsc_code           | character varying        |
+| builder_kyc_status          | character varying        |
+| builder_kyc_verified_at     | timestamp with time zone |
+| builder_kyc_verified_by     | uuid                     |
+| kam_name                    | character varying        |
+| kam_phone                   | character varying        |
+| kam_email                   | character varying        |
+| kam_user_id                 | uuid                     |
+| kam_allocated_date          | date                     |
+| kam_notes                   | text                     |
+| status                      | character varying        |
+| is_activated                | boolean                  |
+| activated_at                | timestamp with time zone |
+| activated_by                | uuid                     |
+| created_at                  | timestamp with time zone |
+| updated_at                  | timestamp with time zone |
+| created_by                  | text                     |
+| search_vector               | tsvector                 |
+| builder_id                  | uuid                     |
+| builder_logo_url            | text                     |
+| og_preview_image_url        | text                     |
+| project_thumbnail_url       | text                     |
+| id                          | uuid                     |
+| project_name                | character varying        |
+| project_code                | character varying        |
+| location                    | text                     |
+| city                        | character varying        |
+| state                       | character varying        |
+| pincode                     | character varying        |
+| registration_number         | character varying        |
+| registration_date           | date                     |
+| survey_details              | text                     |
+| total_units                 | integer                  |
+| available_units             | integer                  |
+| project_type                | character varying        |
+| possession_date             | date                     |
+| approved_banks              | jsonb                    |
+| builder_name                | character varying        |
+| builder_company_name        | character varying        |
+| builder_contact_name        | character varying        |
+| builder_phone               | character varying        |
+| builder_email               | character varying        |
+| builder_gst_number          | character varying        |
+| builder_pan_number          | character varying        |
+| builder_registration_number | character varying        |
+| builder_address             | text                     |
+| builder_city                | character varying        |
+| builder_state               | character varying        |
+| builder_pincode             | character varying        |
+| builder_bank_name           | character varying        |
+| builder_account_number      | character varying        |
+| builder_ifsc_code           | character varying        |
+| builder_kyc_status          | character varying        |
+| builder_kyc_verified_at     | timestamp with time zone |
+| builder_kyc_verified_by     | uuid                     |
+| kam_name                    | character varying        |
+| kam_phone                   | character varying        |
+| kam_email                   | character varying        |
+| kam_user_id                 | uuid                     |
+| kam_allocated_date          | date                     |
+| kam_notes                   | text                     |
+| status                      | character varying        |
+| is_activated                | boolean                  |
+| activated_at                | timestamp with time zone |
+| activated_by                | uuid                     |
+| created_at                  | timestamp with time zone |
+| updated_at                  | timestamp with time zone |
+| created_by                  | uuid                     |
+| search_vector               | tsvector                 |
+
 Business rules:
 
 - Every query must be filtered for the current logged-in user.
 - If owner-specific data: customers.owner_user_id = :user_id
 - If followup-specific data: followups.assigned_user_id = :user_id
-- If builder-specific data: customers.builder_id = :builder_id
-- Refer below columns from lead_ai_analytics_360 for applying filter on builder_id and salesperson_id when required:
-    - For builder_id filter: attributed_builder_id
+- If builder-specific data: projects.builder_id = :builder_id
+- Always use projects.builder_id = :builder_id for scoping to builder's data, never use creator_user_id for builders. i.e
+
+for ex :
+
+select * from projects p 
+inner join leads l on p.id = l.project_id
+where builder_id = <builder_id>
+
+
+- Refer below columns from lead_ai_analytics_360 for applying filter on salesperson_id when required:
     - For salesperson_id filter: assigned_salesperson_id or lead_created_by_user_id depending on context of the question and data model
+
 - Do not apply creation_user_id filter if role is builder :
     - For example : 
         question: "show me all the customers for whom loans are disbursed ?"
