@@ -1030,9 +1030,11 @@ Rules:
 - Include proper joins and aliases
 
 
-Query Rules and business logics :
+Whiles correcting the query please follow the below Query Rules and business logics :
 
 - Every query must be filtered for the current logged-in user.
+- Assigned_to in leads table is the salesperson_user_id and creator_user_id in customer_360_view is the salesperson_user_id
+- If Role is builder , bulder_id should be taken from customer_360_view.builder_id .
 - If owner-specific data: customers.owner_user_id = :user_id
 - If followup-specific data: followups.assigned_user_id = :user_id
 - If builder-specific data: customers.builder_id = :builder_id
@@ -1062,11 +1064,14 @@ Query Rules and business logics :
             (
                 "user",
                 """
-Schema:
-{schema_context}
+User question:
+{user_question}
 
 User context:
 {user_context}
+
+Schema:
+{schema_context}
 
 Original query plan:
 {agent1_plan}
@@ -1077,7 +1082,7 @@ Failing SQL query:
 Execution error:
 {execution_error}
 
-Please correct this query to resolve the error.
+Please correct this query to resolve the error while keeping the original intent of the user question in mind.
 """
             )
         ]
@@ -1085,8 +1090,9 @@ Please correct this query to resolve the error.
 
     result = structured_llm.invoke(
         prompt.format_messages(
-            schema_context=state["schema_context"],
+            user_question=state["user_question"],
             user_context=json.dumps(state["user_context"], indent=2),
+            schema_context=state["schema_context"],
             agent1_plan=json.dumps(state["agent1_plan"], indent=2),
             sql_query=state["sql_query"],
             execution_error=state["execution_error"],
