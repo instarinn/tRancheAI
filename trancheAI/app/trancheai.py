@@ -485,7 +485,8 @@ where builder_id = <builder_id>
         Sample SQL snippet for builder role:
 
         SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status , c.customer_mobile FROM customer_360_view AS c 
-        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = 'eefa948a-2299-4af2-81e5-8ea3dc3e016e' ;
+        JOIN projects AS p ON c.project_id = p.id
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND p.builder_id = 'eefa948a-2299-4af2-81e5-8ea3dc3e016e' ;
 
 - Only Apply creation_user_id filter if role is builder when builder asks :
     - For example : 
@@ -496,7 +497,8 @@ where builder_id = <builder_id>
         Sample SQL snippet for builder role:
 
         SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status , c.customer_mobileFROM customer_360_view AS c 
-        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = '<builder_id>' and creation_user_id = '<creation_user_id>' ;
+        JOIN projects AS p ON c.project_id = p.id
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND p.builder_id = '<builder_id>' and c.creation_user_id = '<creation_user_id>' ;
 
 - Customer with Pending tranches means disbursed custolmer with pending payments.
 - For example : 
@@ -506,7 +508,8 @@ where builder_id = <builder_id>
         Sample SQL snippet for builder role:
 
         SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount, l.current_status , c.customer_mobile FROM customer_360_view AS c 
-        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND c.builder_id = '<builder_id>' AND pening_payment_count > 0 ;
+        JOIN projects AS p ON c.project_id = p.id
+        JOIN loan_application_status_212d7de7 AS l ON c.unique_lead_id = l.unique_lead_id WHERE l.current_status = 'Disbursed' AND p.builder_id = '<builder_id>' AND c.pending_payment_count > 0 ;
 
 - Customer to followup today will be all the customers or leads created in last 5 days.
 - For example : 
@@ -515,7 +518,9 @@ where builder_id = <builder_id>
         
         Sample SQL snippet for builder role:
 
-        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view AS c where customer_created_at >= current_date - interval '5' day AND c.builder_id = '<builder_id>' ;
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view AS c 
+        JOIN projects AS p ON c.project_id = p.id
+        where customer_created_at >= current_date - interval '5' day AND p.builder_id = '<builder_id>' ;
         
 - How many leads were generated this week?
 - For example :
@@ -524,7 +529,9 @@ where builder_id = <builder_id>
 
         Sample SQL snippet for builder role:
 
-        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view where customer_created_at >= current_date - interval '7' day AND builder_id = '<builder_id>' ;
+        SELECT c.customer_id, c.customer_name, c.disbursed_applications, c.total_disbursed_amount , c.customer_mobile FROM customer_360_view 
+        JOIN projects AS p ON c.project_id = p.id
+        where customer_created_at >= current_date - interval '7' day AND p.builder_id = '<builder_id>' ;
 
         question: "how many leads were generated this week?"
         role: salesperson
@@ -541,7 +548,9 @@ where builder_id = <builder_id>
 
         Sample SQL snippet for builder role:
 
-        SELECT c.creator_name , count(*) FROM customer_360_view c where builder_id = '<builder_id>' 
+        SELECT c.creator_name , count(*) FROM customer_360_view c 
+        JOIN projects AS p ON c.project_id = p.id
+        where builder_id = '<builder_id>' 
         group by c.creator_name 
         order by count(*) desc limit 5;
 
@@ -560,9 +569,10 @@ where builder_id = <builder_id>
         NULLIF(COUNT(*), 0) * 100, 
         2
         ) as conversion_rate_percentage
-        FROM leads
+        FROM leads l
+        Join projects p ON l.project_id = p.id
         WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'
-        and attributed_builder_id = '<builder_id>'; -- Last 90 days
+        and p.builder_id = '<builder_id>'; -- Last 90 days
 
 -- OR by time period (monthly trend):
         SELECT 
@@ -574,9 +584,10 @@ where builder_id = <builder_id>
         NULLIF(COUNT(*), 0) * 100, 
         2
         ) as conversion_rate
-        FROM leads
+        FROM leads l
+        JOIN projects p ON l.project_id = p.id
         WHERE created_at >= CURRENT_DATE - INTERVAL '6 months'
-        and attributed_builder_id = '<builder_id>'
+        and p.builder_id = '<builder_id>'
         GROUP BY DATE_TRUNC('month', created_at)
         ORDER BY month DESC;
 
@@ -590,9 +601,10 @@ where builder_id = <builder_id>
         NULLIF(COUNT(*), 0) * 100, 
         2
         ) as conversion_rate
-        FROM leads
+        FROM leads l
+        JOIN projects p ON l.project_id = p.id
         WHERE created_at >= CURRENT_DATE - INTERVAL '90 days'
-        and attributed_builder_id = '<builder_id>'
+        and p.builder_id = '<builder_id>'
         GROUP BY lead_source
         ORDER BY conversion_rate DESC;
 
@@ -616,10 +628,11 @@ where builder_id = <builder_id>
         l.follow_up_date,
         CURRENT_DATE - l.follow_up_date as days_overdue
         FROM leads l
+        JOIN projects p ON l.project_id = p.id
         WHERE l.follow_up_date IS NOT NULL
         AND l.follow_up_date < CURRENT_DATE - INTERVAL '3 days'
         AND l.status NOT IN ('Booked', 'lost', 'Dead', 'Converted')
-        where attributed_builder_id = '<builder_id>'
+        and p.builder_id = '<builder_id>'
         ORDER BY l.follow_up_date ASC
         LIMIT 100;
 
@@ -629,6 +642,7 @@ where builder_id = <builder_id>
         COUNT(*) as pending_followups,
         AVG(CURRENT_DATE - l.follow_up_date) as avg_days_overdue
         FROM leads l
+        JOIN projects p ON l.project_id = p.id
         WHERE l.follow_up_date IS NOT NULL
         AND l.follow_up_date < CURRENT_DATE - INTERVAL '3 days'
         AND l.status NOT IN ('Booked', 'lost', 'Dead', 'Converted')
