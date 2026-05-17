@@ -361,6 +361,9 @@ Business rules:
 - If owner-specific data: customers.owner_user_id = :user_id
 - If followup-specific data: followups.assigned_user_id = :user_id
 - If builder-specific data: customers.builder_id = :builder_id
+- Refer below columns from lead_ai_analytics_360 for applying filter on builder_id and salesperson_id when required:
+    - For builder_id filter: attributed_builder_id
+    - For salesperson_id filter: assigned_salesperson_id or lead_created_by_user_id depending on context of the question and data model
 - Do not apply creation_user_id filter if role is builder :
     - For example : 
         question: "show me all the customers for whom loans are disbursed ?"
